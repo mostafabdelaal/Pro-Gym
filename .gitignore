@@ -1,0 +1,38 @@
+# AI assistant config (local only)
+CLAUDE.md
+.claude/
+
+# DB / environment config (contains connection credentials)
+database.php
+.env
+.env.*
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+._*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Logs & temp
+*.log
+*.tmp
+*.cache
+error_log
+php_errors.log
+
+# Dependency / build junk
+node_modules/
+vendor/
+
+# Uploads / user-generated (uncomment if used)
+# uploads/

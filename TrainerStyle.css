@@ -1,0 +1,428 @@
+/* Resetting default margin and padding for all elements */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body styles */
+body {
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif; /* Set font family */
+    line-height: 1.6; /* Set line height for better readability */
+    background-image: url('7.jpg'); /* Set background image */
+    background-size: cover; /* Cover the entire background */
+    background-position: center; /* Center the background image */
+    color: #333; /* Set text color */
+    overflow: hidden;
+}
+
+/* Header styles */
+header {
+    background-color: transparent; /* Transparent background */
+    color: #ffffff; /* Text color for the header */
+    padding: 5rem; /* Padding around header content */
+    text-align: center; /* Center-align header content */
+    font-size: 45px;
+    -webkit-text-stroke: 4px #ffffffdc; /* Text stroke for outline effect */
+    -webkit-text-fill-color: transparent; /* Transparent text fill color */
+}
+
+/* Wrapper styles */
+.wrapper {
+    border: 2px solid #ccc; /* Gray border around the wrapper */
+    border-radius: 10px; /* Rounded corners for the wrapper */
+    padding: 20px; /* Padding inside the wrapper */
+    margin: 20px; /* Margin around the wrapper */
+    backdrop-filter: blur(5px); /* Blur effect for the wrapper background */
+}
+
+/* Main styles */
+.trainer-container {
+    display: flex; /* Use flexbox for layout */
+    flex-wrap: wrap; /* Wrap items when necessary */
+    justify-content: space-around; /* Space items evenly */
+    margin-top: 2rem; /* Margin from the top */
+}
+
+.trainer {
+    width: 300px; /* Set width of trainer card */
+    background-color: #ffffff6c; /* White background for trainer card */
+    border-radius: 10px; /* Rounded corners */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Box shadow for depth */
+    margin-bottom: 1.5rem; /* Margin at the bottom of each trainer card */
+    padding: 1.5rem; /* Padding inside each trainer card */
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; /* Smooth transitions */
+}
+
+/* Hover effect for trainer cards */
+.trainer:hover {
+    transform: translateY(-5px); /* Move card up slightly on hover */
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Increased shadow on hover */
+}
+
+.trainer img {
+    width: 100%; /* Full width image inside trainer card */
+    height: 200px; /* Fixed height for trainer image */
+    object-fit: cover; /* Maintain aspect ratio and cover entire space */
+    border-radius: 10px; /* Rounded corners for image */
+    margin-bottom: 1rem; /* Margin at the bottom of the image */
+    transition: transform 0.3s ease-in-out; /* Smooth image scale transition */
+}
+
+/* Hover effect for trainer images */
+.trainer:hover img {
+    transform: scale(1.1); /* Scale up image on hover */
+}
+
+.trainer h2 {
+    font-size: 1.8rem; /* Set font size for trainer name */
+    margin-bottom: 0.5rem; /* Margin at the bottom of the name */
+    color: #333; /* Text color for trainer name */
+    font-weight: 900; /* Bold font weight for trainer name */
+    text-align: center; /* Center-align trainer name */
+}
+
+.trainer p {
+    font-size: 1.2rem; /* Set font size for trainer description */
+    margin-bottom: 1rem; /* Margin at the bottom of the description */
+    color: #000000; /* Text color for trainer description */
+    text-align: center; /* Center-align trainer description */
+    font-weight: 500; /* Normal font weight for trainer description */
+}
+
+.social-links {
+    display: flex; /* Use flexbox for social links */
+    justify-content: center; /* Center-align social links */
+    margin-top: 1rem; /* Add margin to separate from trainer description */
+}
+
+.social-links a {
+    display: inline-block; /* Make the links behave as blocks */
+    margin: 0 0.5rem; /* Add spacing between social links */
+    transition: transform 0.3s ease-in-out; /* Smooth transform on hover */
+}
+
+/* Improve the appearance of social media icons */
+.social-links img {
+    width: 40px; /* Set a fixed width for all icons */
+    height: 40px; /* Set a fixed height for all icons */
+    border-radius: 20%; /* Make the icons circular */
+    background-color: #ffffff15; /* Add a semi-transparent white background to icons */
+    padding: 8px; /* Add padding to icons for better visual appearance */
+    transition: transform 0.3s ease-in-out; /* Smooth transform on hover */
+}
+
+/* Hover effect for social links */
+.social-links a:hover img {
+    transform: scale(1.2); /* Scale up icon on hover */
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .trainer {
+        width: calc(50% - 1rem); /* Responsive width for trainer cards */
+    }
+}
+
+
+
+.logo {
+    position: absolute;
+    top: 5px;
+    left: 1px;
+    width: 250px;
+    height: auto;
+    display: block;
+    z-index: 11;
+  }
+
+  
+  [type="checkbox"]:checked,
+  [type="checkbox"]:not(:checked) {
+    position: absolute;
+    left: -9999px;
+  }
+  
+  .menu-icon:checked+label,
+  .menu-icon:not(:checked)+label {
+    position: fixed;
+    top: 63px;
+    right: 75px;
+    display: block;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    z-index: 10;
+  }
+  
+  .menu-icon:checked+label:before,
+  .menu-icon:not(:checked)+label:before {
+    position: absolute;
+    content: '';
+    display: block;
+    width: 30px;
+    height: 20px;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    border-top: 2px solid #000000;
+    border-bottom: 2px solid #000000; 
+    transition: border-width 100ms 1500ms ease,
+      top 100ms 1600ms cubic-bezier(0.23, 1, 0.32, 1),
+      height 100ms 1600ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 200ms ease,
+      transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  
+  
+  .menu-icon:checked+label:after,
+  .menu-icon:not(:checked)+label:after {
+    position: absolute;
+    content: '';
+    display: block;
+    width: 22px;
+    height: 2px;
+    z-index: 20;
+    top: 10px;
+    right: 4px;
+    background-color: #000000;
+    margin-top: -1px;
+    transition: width 100ms 1750ms ease,
+      right 100ms 1750ms ease,
+      margin-top 100ms ease,
+      transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  
+  .menu-icon:checked+label:before {
+    top: 10px;
+    transform: rotate(45deg);
+    height: 2px;
+    background-color: #000000;
+    border-width: 0;
+    transition: border-width 100ms 340ms ease,
+      top 100ms 300ms cubic-bezier(0.23, 1, 0.32, 1),
+      height 100ms 300ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 200ms 500ms ease,
+      transform 200ms 1700ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  .menu-icon:checked+label:after {
+    width: 30px;
+    margin-top: 0;
+    right: 0;
+    transform: rotate(-45deg);
+    transition: width 100ms ease,
+      right 100ms ease,
+      margin-top 100ms 500ms ease,
+      transform 200ms 1700ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  .nav {
+    position: fixed;
+    top: 33px;
+    right: 50px;
+    display: block;
+    width: 80px;
+    height: 80px;
+    padding: 0;
+    margin: 0;
+    z-index: 9;
+    overflow: hidden;
+    box-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.3);
+    background-color: #414141;
+    animation: border-transform 7s linear infinite;
+    transition: top 350ms 1100ms cubic-bezier(0.23, 1, 0.32, 1),
+      right 350ms 1100ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 250ms 1100ms ease,
+      width 650ms 400ms cubic-bezier(0.23, 1, 0.32, 1),
+      height 650ms 400ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  @keyframes border-transform {
+  
+    0%,
+    100% {
+      border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
+    }
+  
+    14% {
+      border-radius: 40% 60% 54% 46% / 49% 60% 40% 51%;
+    }
+  
+    28% {
+      border-radius: 54% 46% 38% 62% / 49% 70% 30% 51%;
+    }
+  
+    42% {
+      border-radius: 61% 39% 55% 45% / 61% 38% 62% 39%;
+    }
+  
+    56% {
+      border-radius: 61% 39% 67% 33% / 70% 50% 50% 30%;
+    }
+  
+    70% {
+      border-radius: 50% 50% 34% 66% / 56% 68% 32% 44%;
+    }
+  
+    84% {
+      border-radius: 46% 54% 50% 50% / 35% 61% 39% 65%;
+    }
+  }
+  
+  .menu-icon:checked~.nav {
+    animation-play-state: paused;
+    top: 50%;
+    right: 50%;
+    transform: translate(50%, -50%);
+    width: 200%;
+    height: 200%;
+    transition: top 350ms 700ms cubic-bezier(0.23, 1, 0.32, 1),
+      right 350ms 700ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 250ms 700ms ease,
+      width 750ms 1000ms cubic-bezier(0.23, 1, 0.32, 1),
+      height 750ms 1000ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  
+  .nav ul {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    z-index: 6;
+    text-align: center;
+    transform: translateY(-50%);
+    list-style: none;
+  }
+  
+  .nav ul li {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 10px 0;
+    text-align: center;
+    list-style: none;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(30px);
+    transition: all 250ms linear;
+  }
+  
+  .nav ul li:nth-child(1) {
+    transition-delay: 200ms;
+  }
+  
+  .nav ul li:nth-child(2) {
+    transition-delay: 150ms;
+  }
+  
+  .nav ul li:nth-child(3) {
+    transition-delay: 100ms;
+  }
+  
+  .nav ul li:nth-child(4) {
+    transition-delay: 50ms;
+  }
+  
+  .nav ul li a {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 9vh;
+    text-transform: uppercase;
+    line-height: 1.2;
+    font-weight: 800;
+    display: inline-block;
+    position: relative;
+    color: #ececee;
+    transition: all 250ms linear;
+  }
+  
+  .nav ul li a:hover {
+    text-decoration: none;
+    color: #000000;
+  }
+  
+  .nav ul li a:after {
+    display: block;
+    position: absolute;
+    top: 50%;
+    content: '';
+    height: 2vh;
+    margin-top: -1vh;
+    width: 0;
+    left: 0;
+    background-color: #000000;
+    opacity: 0.8;
+    transition: width 250ms linear;
+  }
+  
+  .nav ul li a:hover:after {
+    width: 100%;
+  }
+  
+  
+  .menu-icon:checked~.nav ul li {
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 350ms ease,
+      transform 250ms ease;
+  }
+  
+  .menu-icon:checked~.nav ul li:nth-child(1) {
+    transition-delay: 1400ms;
+  }
+  
+  .menu-icon:checked~.nav ul li:nth-child(2) {
+    transition-delay: 1480ms;
+  }
+  
+  .menu-icon:checked~.nav ul li:nth-child(3) {
+    transition-delay: 1560ms;
+  }
+  
+  .menu-icon:checked~.nav ul li:nth-child(4) {
+    transition-delay: 1640ms;
+  }
+  
+  .menu-icon:checked~.nav ul li:nth-child(5) {
+    transition-delay: 1720ms;
+  }
+  .menu-icon:checked~.nav ul li:nth-child(6) {
+    transition-delay: 1800ms;
+  }
+  .menu-icon:checked~.nav ul li:nth-child(7) {
+    transition-delay: 1880ms;
+  }
+  .menu-icon:checked~.nav ul li:nth-child(8) {
+    transition-delay: 1960ms;
+  }
+  
+  
+  @media screen and (max-width: 991px) {
+  
+    .menu-icon:checked+label,
+    .menu-icon:not(:checked)+label {
+      right: 55px;
+    }
+  
+  
+  
+    .nav {
+      right: 30px;
+    }
+  
+    .nav ul li a {
+      font-size: 8vh;
+    }
+  }
+  
