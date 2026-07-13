@@ -1,51 +1,46 @@
 <?php
-// Start session
-session_start();
+// Record a member's plan choice as a pending subscription, then go to checkout.
+require_once __DIR__ . '/../includes/auth.php';
+$conn = db();
 
-// Check if email is set in session
-if(isset($_SESSION['email'])) {
-    // Retrieve email from session
-    $email = $_SESSION['email'];
-    
-    // Retrieve plan from form
-    $plan = $_POST['plan']; // This will be either "BEGINNER" or "INTERMEDIATE" or "EXPERT" or "ADVANCED" or "ELITE"
-    
-    // Database connection settings
-    $servername = "localhost";
-    $username = "root"; // Change this if you have a different username
-    $password = ""; // Change this if you have set a password for MySQL
-    $dbname = "gymster"; // Change this if your database name is different
-    
-    // Create connection
-    $conn = new mysqli($servername, $username, $password, $dbname);
-    
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-    
-    // Prepare SQL statement to update plan for the given email
-    $stmt = $conn->prepare("UPDATE members_data SET plan = ? WHERE email = ?");
-    
-    $stmt->bind_param("ss", $plan, $email);
-    
-    // Execute SQL statement to update plan
-    if ($stmt->execute()) {
-        // Close statement
-        $stmt->close();
-        
-        // Close connection
-        $conn->close();
-        
-        // Redirect to payment page
-        header("Location: ../pages/Payment.php");
-        exit();
-    } else {
-        echo "Error: " . $stmt->error;
-    }
-} else {
-    // Redirect to login page or handle unauthorized access
-    header("Location: ../pages/LoginPage.php");
+require_login();
+csrf_verify();
+
+$member = current_member($conn);
+if (!$member) {
+    header('Location: ../pages/LoginPage.php');
     exit();
 }
-?>
+
+$planCode = strtoupper(trim($_POST['plan'] ?? ''));
+
+$stmt = $conn->prepare("SELECT id FROM plans WHERE code = ? AND is_active = 1");
+$stmt->bind_param('s', $planCode);
+$stmt->execute();
+$plan = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$plan) {
+    header('Location: ../pages/Packages.php?error=invalid_plan');
+    exit();
+}
+
+$memberId = (int) $member['id'];
+$planId   = (int) $plan['id'];
+
+// Drop any stale pending choice, then record the new one.
+$del = $conn->prepare("DELETE FROM subscriptions WHERE member_id = ? AND status = 'pending'");
+$del->bind_param('i', $memberId);
+$del->execute();
+$del->close();
+
+$ins = $conn->prepare(
+    "INSERT INTO subscriptions (member_id, plan_id, billing_interval, status)
+     VALUES (?, ?, 'monthly', 'pending')"
+);
+$ins->bind_param('ii', $memberId, $planId);
+$ins->execute();
+$ins->close();
+
+header('Location: ../pages/Payment.php');
+exit();

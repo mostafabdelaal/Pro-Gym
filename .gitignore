@@ -6,8 +6,12 @@ CLAUDE.md
 
 # DB / environment config (contains connection credentials)
 database.php
+config/mail.php
 .env
 .env.*
+
+# Local runtime state (reset links log, etc.)
+storage/
 
 # OS junk
 Thumbs.db

@@ -1,39 +1,48 @@
 <?php
-// Database connection parameters
-$servername = "localhost";
-$username = "root"; // Default username for XAMPP MySQL
-$password = ""; // Default password for XAMPP MySQL
-$database = "gymster";
+// Register a new member. Prepared statement + hashed password + CSRF + validation.
+require_once __DIR__ . '/../includes/auth.php';
+$conn = db();
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $database);
+csrf_verify();
 
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+$first    = trim($_POST['first_Name'] ?? '');
+$last     = trim($_POST['last_Name'] ?? '');
+$email    = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
+$phone    = trim($_POST['phone'] ?? '');
+$birth    = trim($_POST['birth_date'] ?? '');
+$password = $_POST['password'] ?? '';
+
+if ($first === '' || $last === '' || $email === false || $password === '') {
+    header('Location: ../pages/Register.php?error=invalid');
+    exit();
+}
+if (strlen($password) < 8) {
+    header('Location: ../pages/Register.php?error=weak_password');
+    exit();
 }
 
-// Retrieve and sanitize form data
-$first_name = htmlspecialchars($_POST['first_Name']);
-$last_name = htmlspecialchars($_POST['last_Name']);
-$email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
-$phone = $_POST['phone'];
-$birth_date = $_POST['birth_date'];
-$password = $_POST['password'];
+$birthValue = $birth !== '' ? $birth : null;
+$hash       = password_hash($password, PASSWORD_DEFAULT);
 
-// Prepare SQL statement to insert data into members_data table
-$sql = "INSERT INTO members_data (first_name, last_name, email, phone, birth_date, password)
-        VALUES ('$first_name', '$last_name', '$email', '$phone', '$birth_date', '$password')";
+$stmt = $conn->prepare(
+    "INSERT INTO members (first_name, last_name, email, phone, birth_date, password_hash)
+     VALUES (?, ?, ?, ?, ?, ?)"
+);
+$stmt->bind_param('ssssss', $first, $last, $email, $phone, $birthValue, $hash);
 
-if ($conn->query($sql) === TRUE) {
-    // Registration successful
-    echo "Registration complete. Redirecting to login page...";
-    // Redirect to LoginPage.php after 2 seconds
-    header("refresh:2;url=../pages/LoginPage.php");
-} else {
-    echo "Error: " . $sql . "<br>" . $conn->error;
+if ($stmt->execute()) {
+    $stmt->close();
+    header('refresh:2;url=../pages/LoginPage.php');
+    echo 'Registration complete. Redirecting to the login page…';
+    exit();
 }
 
-// Close database connection
-$conn->close();
-?>
+$duplicate = ($conn->errno === 1062);
+$stmt->close();
+if ($duplicate) {
+    header('Location: ../pages/Register.php?error=email_taken');
+    exit();
+}
+error_log('Registration failed: ' . $conn->error);
+header('Location: ../pages/Register.php?error=server');
+exit();
