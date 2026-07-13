@@ -1,41 +1,6 @@
-# Pro Gym 🏋️‍♂️💪
+# Pro Gym 
 
 Pro Gym (Gympro) is a modern, responsive, premium web application designed to manage gym memberships, trainer scheduling, branch locations, and subscriptions. Built using a lightweight **PHP + MySQL** stack, the project features high-fidelity custom styles, interactive elements, and a clean file architecture.
-
----
-
-## 📂 Project Structure
-
-The codebase has been refactored into a structured, modular layout to keep the workspace clean and maintainable:
-
-```
-Pro-Gym/
-├── config/              # Configuration files (e.g., database connection)
-│   └── database.php     # [Gitignored] Database connection parameters
-├── css/                 # Vanilla CSS stylesheets for all pages
-│   ├── AboutUs.css
-│   ├── Branches.css
-│   └── ... (other stylesheets)
-├── handlers/            # Backend PHP logic for form submissions & requests
-│   ├── handle_login.php
-│   ├── handle_registration.php
-│   └── ... (other action processors)
-├── images/              # Image assets, trainer profiles, and branch photos
-│   ├── BranchesImg/     # Gallery images for gym branches
-│   ├── contact_images/  # Support and social media icons
-│   └── ... (main application backgrounds & logo)
-├── includes/            # Vendored libraries and plugins
-│   └── PHPMailer-master/# PHPMailer library for handling emails
-├── pages/               # Main user-facing PHP views
-│   ├── MainPage.php     # Public landing homepage
-│   ├── LoginPage.php    # User login panel
-│   ├── Register.php     # Membership registration form
-│   ├── Packages.php     # Subscription selection
-│   ├── Profile.php      # Member profile dashboard
-│   └── ... (about us, branches, contact pages)
-├── index.php            # Root router / redirect entry point
-└── .gitignore           # Ignored files (config, vendor, log files)
-```
 
 ---
 
