@@ -36,6 +36,44 @@ if ($result) {
     }
 }
 $totalMembers = count($members);
+
+// --- Real analytics for the Overview tab (were hardcoded) -----------------
+$monthlyRevenue = (float) (($conn->query(
+    "SELECT COALESCE(SUM(total),0) r FROM payments
+     WHERE status = 'paid'
+       AND YEAR(paid_at) = YEAR(CURDATE()) AND MONTH(paid_at) = MONTH(CURDATE())"
+)->fetch_assoc()['r']) ?? 0);
+
+$activeSubs = (int) (($conn->query(
+    "SELECT COUNT(*) c FROM subscriptions WHERE status = 'active'"
+)->fetch_assoc()['c']) ?? 0);
+
+$paidPayments = (int) (($conn->query(
+    "SELECT COUNT(*) c FROM payments WHERE status = 'paid'"
+)->fetch_assoc()['c']) ?? 0);
+
+$revenueByPlan = [];
+$rbpRes = $conn->query(
+    "SELECT p.name, COALESCE(SUM(pay.total),0) rev
+     FROM plans p
+     LEFT JOIN subscriptions s ON s.plan_id = p.id
+     LEFT JOIN payments pay ON pay.subscription_id = s.id AND pay.status = 'paid'
+     GROUP BY p.id
+     ORDER BY p.sort_order, p.id"
+);
+$maxRev = 0;
+if ($rbpRes) {
+    while ($r = $rbpRes->fetch_assoc()) {
+        $rev = (float) $r['rev'];
+        $maxRev = max($maxRev, $rev);
+        $revenueByPlan[] = ['name' => $r['name'], 'rev' => $rev];
+    }
+}
+foreach ($revenueByPlan as &$r) {
+    $r['pct'] = $maxRev > 0 ? (int) round($r['rev'] / $maxRev * 100) : 0;
+    $r['rev'] = 'EGP ' . number_format($r['rev']);
+}
+unset($r);
 ?>
 <!DOCTYPE html>
 <html>
@@ -188,17 +226,12 @@ class Component extends DCLogic {
       adminPageTitle: { overview: 'Overview', members: 'Members', plans: 'Plans', revenue: 'Revenue', classes: 'Classes' }[at] || 'Overview',
       adminStats: [
         { label: 'Total members', value: <?php echo json_encode(number_format($totalMembers)); ?>, trend: 'live from DB' },
-        { label: 'Monthly revenue', value: 'EGP 4.9M', trend: '+8.4%' },
-        { label: 'Active today', value: '1,842', trend: '15% of base' },
-        { label: 'Churn rate', value: '2.1%', trend: '-0.3%' },
+        { label: 'Monthly revenue', value: <?php echo json_encode('EGP ' . number_format($monthlyRevenue)); ?>, trend: 'this month' },
+        { label: 'Active plans', value: <?php echo json_encode(number_format($activeSubs)); ?>, trend: 'live from DB' },
+        { label: 'Payments', value: <?php echo json_encode(number_format($paidPayments)); ?>, trend: 'paid total' },
       ],
-      revenueByPlan: [
-        { name: 'Beginner', pct: 34, rev: 'EGP 0.8M' },
-        { name: 'Intermediate', pct: 58, rev: 'EGP 1.4M' },
-        { name: 'Advanced', pct: 100, rev: 'EGP 1.6M' },
-        { name: 'Expert', pct: 44, rev: 'EGP 0.7M' },
-        { name: 'Elite', pct: 26, rev: 'EGP 0.4M' },
-      ].map((r) => ({ ...r, barStyle: `width:${r.pct}%;height:100%;background:${accent};border-radius:999px;` })),
+      revenueByPlan: (<?php echo json_encode($revenueByPlan); ?>)
+        .map((r) => ({ ...r, barStyle: `width:${r.pct}%;height:100%;background:${accent};border-radius:999px;` })),
       members,
     };
   }

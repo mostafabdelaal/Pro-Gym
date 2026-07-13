@@ -3,6 +3,26 @@
 require_once __DIR__ . '/../includes/auth.php';
 $conn = db();
 require_login();
+
+// Load the coaching team from the database (was hardcoded).
+$trainers = [];
+$res = $conn->query(
+    "SELECT t.name, t.role, t.specialty_tag, t.photo_path
+     FROM trainers t
+     WHERE t.is_active = 1
+     ORDER BY t.id"
+);
+if ($res) {
+    while ($row = $res->fetch_assoc()) {
+        $photo = $row['photo_path'] ?? '';
+        $trainers[] = [
+            'name' => $row['name'],
+            'role' => $row['role'],
+            'tag'  => $row['specialty_tag'] ?? '',
+            'bg'   => $photo !== '' ? "url('../" . $photo . "')" : 'none',
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -49,6 +69,13 @@ require_login();
     <div style="font-size: 12.5px; letter-spacing: 0.18em; text-transform: uppercase; color: #D4FF3D; font-weight: 700; margin-bottom: 14px;">The team</div>
     <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 52px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 8px;">Coaches who care.</h1>
     <p style="font-size: 17px; color: #9a9aa5; margin: 0 0 48px; max-width: 560px;">Certified, obsessive about form, and matched to your goals. Book a session in-app anytime.</p>
+    <?php if (empty($trainers)): ?>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 20px; border: 1px dashed rgba(255,255,255,0.14); border-radius: 20px;">
+      <div style="width: 60px; height: 60px; border-radius: 16px; background: rgba(212,255,61,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; color: #D4FF3D; font-size: 24px;">✦</div>
+      <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">No trainers listed yet</h2>
+      <p style="font-size: 15px; color: #9a9aa5; margin: 0; max-width: 380px;">Coaching staff will appear here once they're added.</p>
+    </div>
+    <?php else: ?>
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
       <sc-for list="{{ trainers }}" as="t" hint-placeholder-count="5">
         <div style="background: #151519; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; overflow: hidden;" style-hover="border-color: rgba(212,255,61,0.35);">
@@ -64,6 +91,7 @@ require_login();
         </div>
       </sc-for>
     </div>
+    <?php endif; ?>
   </section>
 
   <footer style="border-top: 1px solid rgba(255,255,255,0.07); padding: 44px 48px; display: flex; align-items: center; justify-content: space-between; color: #6a6a74; font-size: 13.5px;">
@@ -78,14 +106,8 @@ require_login();
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
   renderVals() {
-    const imgs = ['../images/t5.jpg', '../images/t4.jpg', '../images/t2.jpg', '../images/t3.jpg', '../images/t1.jpg'];
-    const trainers = [
-      { name: 'Mohamed Ahmed', role: 'Certified Fitness Trainer', tag: 'Strength' },
-      { name: 'Mostafa Abdelal', role: 'Yoga Instructor', tag: 'Mobility' },
-      { name: 'Ahmed Yasser', role: 'Personal Trainer', tag: '1-on-1' },
-      { name: 'Abdullah Medhat', role: 'Boxing Instructor', tag: 'Boxing' },
-      { name: 'Asser Essam', role: 'CrossFit Coach', tag: 'CrossFit' },
-    ].map((t, i) => ({ ...t, bg: `url('${imgs[i]}')` }));
+    // Trainers come from the database (see the PHP block above).
+    const trainers = <?php echo json_encode($trainers); ?>;
     return { trainers };
   }
 }

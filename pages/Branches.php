@@ -1,3 +1,16 @@
+<?php
+// Branch locations — loaded from the database (was hardcoded HTML).
+require_once __DIR__ . '/../includes/auth.php';
+$conn = db();
+
+$branches = [];
+$res = $conn->query("SELECT name, image_path FROM branches WHERE is_active = 1 ORDER BY id");
+if ($res) {
+    while ($row = $res->fetch_assoc()) {
+        $branches[] = $row;
+    }
+}
+?>
 <!DOCTYPE html>
 <html>
 
@@ -27,60 +40,26 @@
     </nav>
     <h1>Branches</h1>
     <div class="wrapper">
-        <!-- Wrapped the card in an anchor tag with the href attribute -->
-        <a href="../images/BranchesImg/sheraton.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>Sheraton <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/nasr.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>Nasr city<br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/zamalek.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br> Zamalek <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/5th.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>5th Settlement <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/mad.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>Madinaty <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/zamalek.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>Al Korba <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/5th.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>Al Mohandesin <br> Branch</h2>
-            </div>
-        </a>
-
-        <a href="../images/BranchesImg/mad.png" target="_blank" class="card">
-            <div class="card2">
-                <h2><br><br>AL Shorouk <br> Branch</h2>
-            </div>
-        </a>
-
-        <div class="card">
-            <div class="card2">
-                <h2><br><br>AL Dokki <br> Branch </h2>
-            </div>
-        </div>
+        <?php if (empty($branches)): ?>
+            <p style="color:#666;">No branches available yet.</p>
+        <?php else: ?>
+            <?php foreach ($branches as $b): ?>
+                <?php $img = $b['image_path'] ?? ''; ?>
+                <?php if ($img !== ''): ?>
+                    <a href="../<?php echo htmlspecialchars($img); ?>" target="_blank" class="card">
+                        <div class="card2">
+                            <h2><br><br><?php echo htmlspecialchars($b['name']); ?> <br> Branch</h2>
+                        </div>
+                    </a>
+                <?php else: ?>
+                    <div class="card">
+                        <div class="card2">
+                            <h2><br><br><?php echo htmlspecialchars($b['name']); ?> <br> Branch</h2>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </body>
 </html>

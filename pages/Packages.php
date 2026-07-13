@@ -3,6 +3,34 @@
 require_once __DIR__ . '/../includes/auth.php';
 $conn = db();
 require_login();
+
+// Load plans + their features from the database (was hardcoded in JS).
+$planData = [];
+$plansRes = $conn->query(
+    "SELECT id, code, monthly_price, is_popular
+     FROM plans WHERE is_active = 1 ORDER BY sort_order, id"
+);
+if ($plansRes && $plansRes->num_rows > 0) {
+    // Fetch every feature in one query, then group in PHP (avoids N+1).
+    $featuresByPlan = [];
+    $featRes = $conn->query(
+        "SELECT plan_id, feature FROM plan_features ORDER BY plan_id, sort_order, id"
+    );
+    if ($featRes) {
+        while ($f = $featRes->fetch_assoc()) {
+            $featuresByPlan[(int) $f['plan_id']][] = $f['feature'];
+        }
+    }
+    while ($p = $plansRes->fetch_assoc()) {
+        $pid = (int) $p['id'];
+        $planData[] = [
+            'name'     => $p['code'],
+            'price'    => (float) $p['monthly_price'],
+            'popular'  => (bool) $p['is_popular'],
+            'features' => $featuresByPlan[$pid] ?? [],
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -99,13 +127,7 @@ class Component extends DCLogic {
   renderVals() {
     const accent = '#D4FF3D';
     const annual = this.state.billing === 'annual';
-    const planData = [
-      { name: 'BEGINNER', price: 1000, popular: false, features: ['Access to basic gym equipment', 'Basic fitness assessment', '1 group class per week', '1 private session / month'] },
-      { name: 'INTERMEDIATE', price: 2000, popular: false, features: ['Full equipment access', 'Personalized workout plan', 'Access to swimming pool', '2 private sessions / month'] },
-      { name: 'ADVANCED', price: 3000, popular: true, features: ['Full equipment access', 'Unlimited group classes', 'Pool / sauna / steam', '3 private sessions / month'] },
-      { name: 'EXPERT', price: 4000, popular: false, features: ['Customized workout plan', 'Exclusive VIP events', '5 private sessions / month', 'Unlimited group classes'] },
-      { name: 'ELITE', price: 5000, popular: false, features: ['Advanced fitness testing', 'Customized nutrition plans', 'Priority scheduling', 'Performance tracking & analysis'] },
-    ];
+    const planData = <?php echo json_encode($planData); ?>;
     const plans = planData.map((p) => {
       const disp = annual ? Math.round(p.price * 10 / 12) : p.price;
       return {
