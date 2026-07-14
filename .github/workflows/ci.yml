@@ -1,4 +1,4 @@
-name: PHP Syntax Check (Lint)
+name: CI
 
 on:
   push:
@@ -8,19 +8,70 @@ on:
 
 jobs:
   lint:
+    name: PHP Syntax Lint
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        coverage: none
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
 
-    - name: Run PHP Lint
-      run: |
-        # Find all PHP files, excluding the vendored includes/ directory, and check for syntax errors
-        find . -name "*.php" ! -path "*/includes/*" -type f -print0 | xargs -0 -n 1 -P 4 php -l
+      - name: Lint all PHP (excluding vendored PHPMailer)
+        run: |
+          # Lint every PHP file, including our own includes/ and src/, but skip
+          # the vendored PHPMailer library.
+          find . -name "*.php" ! -path "*/PHPMailer-master/*" -type f -print0 \
+            | xargs -0 -n 1 -P 4 php -l
+
+  database:
+    name: Database Schema & Seeders
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gymster
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -uroot -proot --silent; then
+              echo "MySQL is up"; break
+            fi
+            sleep 2
+          done
+
+      - name: Load schema and seeders
+        run: |
+          MYSQL="mysql -h 127.0.0.1 -uroot -proot gymster"
+          $MYSQL < database/migrations/001_create_schema.sql
+          $MYSQL < database/seeders/002_seed_reference_data.sql
+          $MYSQL < database/seeders/003_seed_demo_member.sql
+
+      - name: Assert schema and seed data
+        run: |
+          Q="mysql -h 127.0.0.1 -uroot -proot -N -e"
+          TABLES=$($Q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='gymster'")
+          PLANS=$($Q "SELECT COUNT(*) FROM gymster.plans")
+          BRANCHES=$($Q "SELECT COUNT(*) FROM gymster.branches")
+          DEMO=$($Q "SELECT COUNT(*) FROM gymster.members WHERE email='demo@progym.local'")
+          echo "tables=$TABLES plans=$PLANS branches=$BRANCHES demo_member=$DEMO"
+          test "$TABLES" -ge 14
+          test "$PLANS" -eq 5
+          test "$BRANCHES" -eq 9
+          test "$DEMO" -eq 1
