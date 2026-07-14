@@ -9,6 +9,49 @@ $d         = member_display($member);
 $fullName  = $d['fullName'];
 $initials  = $d['initials'];
 $planLabel = $d['planLabel'];
+$memberId  = (int) ($member['id'] ?? 0);
+
+// --- Latest workout session from the DB (was hardcoded in JS) --------------
+$workoutTitle = 'No active session';
+$exData   = [];
+$doneSets = [];
+$wq = $conn->prepare(
+    "SELECT id, title FROM workouts WHERE member_id = ? ORDER BY performed_at DESC, id DESC LIMIT 1"
+);
+$wq->bind_param('i', $memberId);
+$wq->execute();
+$w = $wq->get_result()->fetch_assoc();
+$wq->close();
+
+if ($w) {
+    $workoutTitle = $w['title'];
+    $sq = $conn->prepare(
+        "SELECT exercise_name, target_muscle, weight_kg, reps, is_done
+         FROM workout_sets WHERE workout_id = ? ORDER BY id"
+    );
+    $sq->bind_param('i', $w['id']);
+    $sq->execute();
+    $sr = $sq->get_result();
+
+    $index = [];              // exercise_name => position in $exData
+    while ($row = $sr->fetch_assoc()) {
+        $name = $row['exercise_name'];
+        if (!isset($index[$name])) {
+            $index[$name] = count($exData);
+            $exData[] = ['name' => $name, 'target' => $row['target_muscle'] ?? '', 'sets' => []];
+        }
+        $ei = $index[$name];
+        $si = count($exData[$ei]['sets']);
+        $exData[$ei]['sets'][] = [
+            'w' => 0 + $row['weight_kg'],
+            'r' => (int) $row['reps'],
+        ];
+        if ((int) $row['is_done'] === 1) {
+            $doneSets[$ei . '-' . $si] = true;
+        }
+    }
+    $sq->close();
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -70,7 +113,7 @@ $planLabel = $d['planLabel'];
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
         <div>
           <div style="font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #D4FF3D; font-weight: 700; margin-bottom: 6px;">Live session</div>
-          <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0;">Push Day · Chest &amp; Triceps</h1>
+          <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0;"><?php echo htmlspecialchars($workoutTitle); ?></h1>
         </div>
         <div style="text-align: right;">
           <div style="font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700;">42:18</div>
@@ -116,15 +159,10 @@ $planLabel = $d['planLabel'];
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { doneSets: { '0-0': true, '0-1': true, '1-0': true } };
+  state = { doneSets: <?php echo json_encode((object) $doneSets); ?> };
   renderVals() {
     const accent = '#D4FF3D';
-    const exData = [
-      { name: 'Barbell Bench Press', target: 'Chest', sets: [{ w: 60, r: 10 }, { w: 70, r: 8 }, { w: 80, r: 6 }, { w: 80, r: 6 }] },
-      { name: 'Incline Dumbbell Press', target: 'Upper chest', sets: [{ w: 24, r: 12 }, { w: 26, r: 10 }, { w: 28, r: 8 }] },
-      { name: 'Cable Fly', target: 'Chest', sets: [{ w: 15, r: 15 }, { w: 17, r: 12 }, { w: 20, r: 12 }] },
-      { name: 'Triceps Rope Pushdown', target: 'Triceps', sets: [{ w: 25, r: 15 }, { w: 30, r: 12 }, { w: 35, r: 10 }] },
-    ];
+    const exData = <?php echo json_encode($exData); ?>;
     let totalSets = 0, doneCount = 0;
     const exercises = exData.map((ex, ei) => {
       const sets = ex.sets.map((s, si) => {
@@ -138,7 +176,7 @@ class Component extends DCLogic {
       });
       return { ...ex, num: ei + 1, sets };
     });
-    const workoutPct = Math.round(doneCount / totalSets * 100);
+    const workoutPct = totalSets ? Math.round(doneCount / totalSets * 100) : 0;
     return {
       exercises, workoutDone: doneCount, workoutTotal: totalSets,
       workoutPctStyle: `width:${workoutPct}%;height:100%;background:${accent};border-radius:999px;transition:width .4s;`,

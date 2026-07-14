@@ -9,6 +9,66 @@ $d         = member_display($member);
 $fullName  = $d['fullName'];
 $initials  = $d['initials'];
 $planLabel = $d['planLabel'];
+$memberId  = (int) ($member['id'] ?? 0);
+
+// --- Progress data from the DB (was hardcoded in JS) ----------------------
+// Body-weight trend: last 12 measurements, chronological.
+$weights = [];
+$wstmt = $conn->prepare(
+    "SELECT weight_kg FROM body_metrics WHERE member_id = ? ORDER BY recorded_at DESC LIMIT 12"
+);
+$wstmt->bind_param('i', $memberId);
+$wstmt->execute();
+$wr = $wstmt->get_result();
+while ($row = $wr->fetch_assoc()) {
+    $weights[] = (float) $row['weight_kg'];
+}
+$wstmt->close();
+$weights = array_reverse($weights);
+
+// Weekly training volume (tons) over the last 8 weeks.
+$volVals = [];
+$vstmt = $conn->prepare(
+    "SELECT YEARWEEK(w.performed_at, 3) yw, SUM(ws.weight_kg * ws.reps) / 1000 tons
+     FROM workouts w JOIN workout_sets ws ON ws.workout_id = w.id
+     WHERE w.member_id = ? AND w.performed_at >= (CURDATE() - INTERVAL 8 WEEK)
+     GROUP BY yw ORDER BY yw"
+);
+$vstmt->bind_param('i', $memberId);
+$vstmt->execute();
+$vr = $vstmt->get_result();
+while ($row = $vr->fetch_assoc()) {
+    $volVals[] = round((float) $row['tons'], 1);
+}
+$vstmt->close();
+
+// Personal records.
+$prs = [];
+$pstmt = $conn->prepare(
+    "SELECT lift, value_kg FROM personal_records WHERE member_id = ? ORDER BY achieved_at DESC, id DESC"
+);
+$pstmt->bind_param('i', $memberId);
+$pstmt->execute();
+$pr = $pstmt->get_result();
+while ($row = $pr->fetch_assoc()) {
+    $val = rtrim(rtrim(number_format((float) $row['value_kg'], 1), '0'), '.');
+    $prs[] = ['lift' => $row['lift'], 'val' => $val . ' kg', 'delta' => 'PR'];
+}
+$pstmt->close();
+
+// Derived display values.
+$weightChange = !empty($weights) ? round(end($weights) - reset($weights), 1) : 0;
+$weightChangeLabel = ($weightChange > 0 ? '+' : '') . $weightChange . ' kg total';
+
+$cwk = $conn->prepare(
+    "SELECT COUNT(DISTINCT YEARWEEK(performed_at, 3)) c FROM workouts
+     WHERE member_id = ? AND performed_at >= (CURDATE() - INTERVAL 12 WEEK)"
+);
+$cwk->bind_param('i', $memberId);
+$cwk->execute();
+$consWeeks = (int) ($cwk->get_result()->fetch_assoc()['c'] ?? 0);
+$cwk->close();
+$consistency = (int) round(min(12, $consWeeks) / 12 * 100);
 ?>
 <!DOCTYPE html>
 <html>
@@ -76,7 +136,7 @@ $planLabel = $d['planLabel'];
             </div>
             <div style="text-align: right;">
               <div style="font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700;">{{ weightNow }} kg</div>
-              <div style="font-size: 12.5px; color: #D4FF3D; font-weight: 600;">−6.5 kg total</div>
+              <div style="font-size: 12.5px; color: #D4FF3D; font-weight: 600;"><?php echo htmlspecialchars($weightChangeLabel); ?></div>
             </div>
           </div>
           <svg viewBox="0 0 640 200" style="width: 100%; height: 200px;">
@@ -115,7 +175,7 @@ $planLabel = $d['planLabel'];
         </div>
         <div style="background: linear-gradient(135deg,#1a1d10,#141418); border: 1px solid rgba(212,255,61,0.2); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; justify-content: center;">
           <div style="font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #D4FF3D; font-weight: 700; margin-bottom: 10px;">Consistency</div>
-          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 52px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;">92%</div>
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 52px; font-weight: 700; letter-spacing: -0.02em; line-height: 1;"><?php echo $consistency; ?>%</div>
           <p style="font-size: 14.5px; color: #b6b6c0; margin: 12px 0 0; max-width: 260px;">of planned sessions completed in the last 90 days. You're in the top 8% of members.</p>
         </div>
       </div>
@@ -127,27 +187,28 @@ $planLabel = $d['planLabel'];
 class Component extends DCLogic {
   renderVals() {
     const accent = '#D4FF3D';
-    const weight = [82.4, 81.6, 81.1, 80.2, 79.6, 79.0, 78.3, 77.9, 77.2, 76.8, 76.3, 75.9];
-    const wMin = 74, wMax = 83, W = 640, H = 200, PAD = 14;
+    let weight = <?php echo json_encode($weights); ?>;
+    if (!weight.length) weight = [0, 0];
+    const wMin = Math.floor(Math.min(...weight)) - 1;
+    const wMax = Math.ceil(Math.max(...weight)) + 1;
+    const range = (wMax - wMin) || 1;
+    const W = 640, H = 200, PAD = 14;
+    const denom = (weight.length - 1) || 1;
     const pts = weight.map((val, i) => {
-      const x = PAD + i / (weight.length - 1) * (W - PAD * 2);
-      const y = H - PAD - (val - wMin) / (wMax - wMin) * (H - PAD * 2);
+      const x = PAD + i / denom * (W - PAD * 2);
+      const y = H - PAD - (val - wMin) / range * (H - PAD * 2);
       return [Math.round(x), Math.round(y)];
     });
     const weightLine = pts.map((p) => p.join(',')).join(' ');
     const weightArea = `M${pts[0][0]},${H} ` + pts.map((p) => 'L' + p[0] + ',' + p[1]).join(' ') + ` L${pts[pts.length-1][0]},${H} Z`;
-    const volVals = [12.1, 14.5, 13.2, 15.8, 16.4, 15.1, 17.6, 18.2];
-    const volMax = 20;
+    let volVals = <?php echo json_encode($volVals); ?>;
+    if (!volVals.length) volVals = [0];
+    const volMax = Math.max(...volVals, 1) * 1.15;
     const volumeBars = volVals.map((val, i) => ({ label: 'W' + (i + 1),
       barStyle: `height:${Math.round(val / volMax * 100)}%;background:${i === volVals.length - 1 ? accent : 'rgba(212,255,61,0.35)'};border-radius:6px 6px 0 0;width:100%;` }));
     return {
       weightLine, weightArea, weightNow: weight[weight.length - 1].toFixed(1), volumeBars,
-      prs: [
-        { lift: 'Back Squat', val: '140 kg', delta: '+5 kg' },
-        { lift: 'Deadlift', val: '175 kg', delta: '+10 kg' },
-        { lift: 'Bench Press', val: '95 kg', delta: '+2.5 kg' },
-        { lift: 'Overhead Press', val: '60 kg', delta: 'PR' },
-      ],
+      prs: <?php echo json_encode($prs); ?>,
     };
   }
 }

@@ -10,6 +10,105 @@ $fullName  = $d['fullName'];
 $initials  = $d['initials'];
 $greetName = $d['greetName'];
 $planLabel = $d['planLabel'];
+$memberId  = (int) ($member['id'] ?? 0);
+
+// Human-friendly relative day label.
+$relDay = static function (?string $ts): string {
+    if (!$ts) return '';
+    $d0 = new DateTime('today');
+    $d1 = new DateTime($ts); $d1->setTime(0, 0);
+    $diff = (int) $d0->diff($d1)->format('%r%a');
+    if ($diff === 0) return 'Today';
+    if ($diff === -1) return 'Yesterday';
+    if ($diff === 1) return 'Tomorrow';
+    return (new DateTime($ts))->format('D');
+};
+
+$WEEK_GOAL = 5;
+
+// This-week aggregates.
+$stmt = $conn->prepare(
+    "SELECT COUNT(*) sessions, COALESCE(AVG(duration_min),0) avgdur
+     FROM workouts WHERE member_id = ? AND YEARWEEK(performed_at,3) = YEARWEEK(CURDATE(),3)"
+);
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$wk = $stmt->get_result()->fetch_assoc(); $stmt->close();
+$sessionsWeek = (int) $wk['sessions'];
+$avgDur       = (int) round($wk['avgdur']);
+
+$stmt = $conn->prepare(
+    "SELECT COALESCE(SUM(ws.weight_kg*ws.reps),0)/1000 tons
+     FROM workouts w JOIN workout_sets ws ON ws.workout_id = w.id
+     WHERE w.member_id = ? AND YEARWEEK(w.performed_at,3) = YEARWEEK(CURDATE(),3)"
+);
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$volWeek = round((float) $stmt->get_result()->fetch_assoc()['tons'], 1); $stmt->close();
+
+$stmt = $conn->prepare("SELECT COUNT(*) c FROM workouts WHERE member_id = ?");
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$totalSessions = (int) $stmt->get_result()->fetch_assoc()['c']; $stmt->close();
+
+// Recent 3 sessions with per-workout volume.
+$recentActivity = [];
+$stmt = $conn->prepare(
+    "SELECT w.title, w.performed_at, w.duration_min,
+            (SELECT COALESCE(SUM(ws.weight_kg*ws.reps),0)/1000 FROM workout_sets ws WHERE ws.workout_id = w.id) tons
+     FROM workouts w WHERE w.member_id = ? ORDER BY w.performed_at DESC LIMIT 3"
+);
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$rr = $stmt->get_result();
+while ($row = $rr->fetch_assoc()) {
+    $meta = $relDay($row['performed_at']);
+    if (!empty($row['duration_min'])) $meta .= ' · ' . (int) $row['duration_min'] . ' min';
+    $meta .= ' · ' . round((float) $row['tons'], 1) . 't';
+    $recentActivity[] = ['name' => $row['title'], 'meta' => $meta];
+}
+$stmt->close();
+
+// Hero card = latest session.
+$heroTitle = 'No session yet'; $heroEx = 0; $heroSets = 0; $heroDur = 0;
+$stmt = $conn->prepare(
+    "SELECT id, title, duration_min FROM workouts WHERE member_id = ? ORDER BY performed_at DESC, id DESC LIMIT 1"
+);
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$hw = $stmt->get_result()->fetch_assoc(); $stmt->close();
+if ($hw) {
+    $heroTitle = $hw['title'];
+    $heroDur   = (int) $hw['duration_min'];
+    $stmt = $conn->prepare(
+        "SELECT COUNT(DISTINCT exercise_name) ex, COUNT(*) st FROM workout_sets WHERE workout_id = ?"
+    );
+    $stmt->bind_param('i', $hw['id']); $stmt->execute();
+    $c = $stmt->get_result()->fetch_assoc(); $stmt->close();
+    $heroEx = (int) $c['ex']; $heroSets = (int) $c['st'];
+}
+
+// Upcoming classes (next 2).
+$upcoming = [];
+$stmt = $conn->prepare(
+    "SELECT c.name, c.starts_at, c.capacity, b.name branch,
+            (SELECT COUNT(*) FROM class_bookings cb WHERE cb.class_id = c.id AND cb.status='booked') booked,
+            (SELECT COUNT(*) FROM class_bookings cb WHERE cb.class_id = c.id AND cb.member_id = ? AND cb.status='booked') mine
+     FROM classes c LEFT JOIN branches b ON b.id = c.branch_id
+     WHERE c.starts_at > NOW() ORDER BY c.starts_at LIMIT 2"
+);
+$stmt->bind_param('i', $memberId); $stmt->execute();
+$ur = $stmt->get_result();
+while ($row = $ur->fetch_assoc()) {
+    $spots = ((int) $row['mine'] > 0)
+        ? 'Booked'
+        : max(0, (int) $row['capacity'] - (int) $row['booked']) . ' spots left';
+    $time = $relDay($row['starts_at']) . ' · ' . (new DateTime($row['starts_at']))->format('g:i A');
+    $upcoming[] = ['name' => $row['name'], 'time' => $time, 'branch' => $row['branch'] ?? '—', 'spots' => $spots];
+}
+$stmt->close();
+
+$dashStats = [
+    ['label' => 'Sessions this week', 'value' => (string) $sessionsWeek, 'sub' => 'of ' . $WEEK_GOAL . ' goal', 'trend' => $sessionsWeek >= $WEEK_GOAL ? '✓' : ''],
+    ['label' => 'Volume this week',   'value' => $volWeek . 't', 'sub' => 'this week', 'trend' => ''],
+    ['label' => 'Avg duration',       'value' => $avgDur . 'm', 'sub' => 'per session', 'trend' => ''],
+    ['label' => 'Total sessions',     'value' => (string) $totalSessions, 'sub' => 'all time', 'trend' => '🔥'],
+];
 ?>
 <!DOCTYPE html>
 <html>
@@ -80,15 +179,20 @@ $planLabel = $d['planLabel'];
     <div style="padding: 32px 40px 60px; animation: floatUp 0.4s ease both;">
       <div style="margin-bottom: 24px;">
         <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px;">Good morning, <?php echo htmlspecialchars($greetName); ?> 👋</h1>
-        <p style="font-size: 15px; color: #9a9aa5; margin: 0;">You're 1 session away from hitting this week's goal.</p>
+        <p style="font-size: 15px; color: #9a9aa5; margin: 0;"><?php
+          $remaining = max(0, $WEEK_GOAL - $sessionsWeek);
+          echo $remaining > 0
+              ? "You're " . $remaining . ' session' . ($remaining === 1 ? '' : 's') . " away from hitting this week's goal."
+              : "You've hit this week's goal. Great work.";
+        ?></p>
       </div>
 
       <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
         <div style="background: linear-gradient(120deg,#1a1d10,#141418); border: 1px solid rgba(212,255,61,0.22); border-radius: 18px; padding: 28px; display: flex; align-items: center; justify-content: space-between;">
           <div>
-            <div style="font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #D4FF3D; font-weight: 700; margin-bottom: 10px;">Today · Push Day</div>
-            <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; margin: 0 0 6px;">Chest &amp; Triceps</h2>
-            <p style="font-size: 14.5px; color: #b6b6c0; margin: 0 0 22px;">4 exercises · 14 sets · ~60 min</p>
+            <div style="font-size: 12.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #D4FF3D; font-weight: 700; margin-bottom: 10px;">Latest session</div>
+            <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; margin: 0 0 6px;"><?php echo htmlspecialchars($heroTitle); ?></h2>
+            <p style="font-size: 14.5px; color: #b6b6c0; margin: 0 0 22px;"><?php echo $heroEx; ?> exercise<?php echo $heroEx === 1 ? '' : 's'; ?> · <?php echo $heroSets; ?> sets<?php echo $heroDur > 0 ? ' · ~' . $heroDur . ' min' : ''; ?></p>
             <a href="Workout.php" style="display: inline-flex; align-items: center; background: #D4FF3D; color: #0B0B0E; border-radius: 999px; padding: 14px 28px; font-weight: 700; font-size: 15px;" style-hover="background:#e6ff7a;">Start workout →</a>
           </div>
           <div style="width: 130px; height: 130px; border-radius: 20px; background-image: linear-gradient(rgba(11,11,14,0.2),rgba(11,11,14,0.4)), url('../images/2.jpg'); background-size: cover; background-position: center;"></div>
@@ -97,10 +201,10 @@ $planLabel = $d['planLabel'];
           <div style="position: relative; width: 128px; height: 128px;">
             <svg width="128" height="128" viewBox="0 0 128 128" style="transform: rotate(-90deg);">
               <circle cx="64" cy="64" r="54" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="12"/>
-              <circle cx="64" cy="64" r="54" fill="none" stroke="#D4FF3D" stroke-width="12" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="68" style="animation: ringGrow 1s ease both;"/>
+              <circle cx="64" cy="64" r="54" fill="none" stroke="#D4FF3D" stroke-width="12" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="<?php echo (int) round(339 * (1 - min($sessionsWeek, $WEEK_GOAL) / $WEEK_GOAL)); ?>" style="animation: ringGrow 1s ease both;"/>
             </svg>
             <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">4/5</span>
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;"><?php echo $sessionsWeek; ?>/<?php echo $WEEK_GOAL; ?></span>
               <span style="font-size: 12px; color: #8a8a95;">sessions</span>
             </div>
           </div>
@@ -164,21 +268,9 @@ $planLabel = $d['planLabel'];
 class Component extends DCLogic {
   renderVals() {
     return {
-      dashStats: [
-        { label: 'Sessions this week', value: '4', sub: 'of 5 goal', trend: '+1' },
-        { label: 'Total volume', value: '18.2t', sub: 'this week', trend: '+12%' },
-        { label: 'Avg duration', value: '62m', sub: 'per session', trend: '+4m' },
-        { label: 'Current streak', value: '9', sub: 'weeks', trend: '🔥' },
-      ],
-      recentActivity: [
-        { name: 'Push Day · Chest & Triceps', meta: 'Yesterday · 58 min · 6.1t' },
-        { name: 'Pull Day · Back & Biceps', meta: 'Mon · 64 min · 7.3t' },
-        { name: 'Leg Day · Squat focus', meta: 'Sat · 71 min · 9.8t' },
-      ],
-      upcoming: [
-        { name: 'HIIT with Asser', time: 'Today · 6:00 PM', branch: 'Zamalek', spots: '3 spots left' },
-        { name: 'Boxing with Abdullah', time: 'Tomorrow · 7:30 AM', branch: 'Nasr City', spots: 'Booked' },
-      ],
+      dashStats: <?php echo json_encode($dashStats); ?>,
+      recentActivity: <?php echo json_encode($recentActivity); ?>,
+      upcoming: <?php echo json_encode($upcoming); ?>,
     };
   }
 }
