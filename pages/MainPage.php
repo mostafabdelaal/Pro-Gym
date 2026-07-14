@@ -40,7 +40,7 @@ $trainerCount = app('trainers')->countActive();
       <a href="MainPage.php" style="font-size: 14.5px; font-weight: 500; color: #F4F4F6;">Home</a>
       <a href="Packages.php" style="font-size: 14.5px; font-weight: 500; color: #b6b6c0;" style-hover="color: #F4F4F6;">Plans</a>
       <a href="Trainer.php" style="font-size: 14.5px; font-weight: 500; color: #b6b6c0;" style-hover="color: #F4F4F6;">Trainers</a>
-      <a href="MainPage.php" style="font-size: 14.5px; font-weight: 500; color: #b6b6c0;" style-hover="color: #F4F4F6;">Branches</a>
+      <a href="Branches.php" style="font-size: 14.5px; font-weight: 500; color: #b6b6c0;" style-hover="color: #F4F4F6;">Branches</a>
     </div>
     <div style="display: flex; align-items: center; gap: 12px;">
       <a href="LoginPage.php" style="display: inline-flex; align-items: center; background: transparent; color: #F4F4F6; border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 10px 20px; font-weight: 600; font-size: 14px; white-space: nowrap;" style-hover="border-color: rgba(255,255,255,0.4);">Log in</a>
