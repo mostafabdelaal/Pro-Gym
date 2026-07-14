@@ -4,36 +4,23 @@ require_once __DIR__ . '/../includes/auth.php';
 $conn = db();
 require_admin($conn);
 
-// Real member roster for the "Members" tab, joined to branch + current plan.
+// Member roster for the "Members" tab, from the member repository.
 $members = [];
-$sql = "SELECT m.id, m.first_name, m.last_name, m.email, m.created_at,
-               b.name AS branch,
-               (SELECT p.code FROM subscriptions s
-                  JOIN plans p ON p.id = s.plan_id
-                 WHERE s.member_id = m.id AND s.status IN ('active','pending')
-                 ORDER BY (s.status = 'active') DESC, s.created_at DESC
-                 LIMIT 1) AS plan
-        FROM members m
-        LEFT JOIN branches b ON b.id = m.home_branch_id
-        ORDER BY m.created_at DESC";
-$result = $conn->query($sql);
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $fn = $row['first_name'] ?? '';
-        $ln = $row['last_name'] ?? '';
-        $name = trim($fn . ' ' . $ln);
-        if ($name === '') $name = $row['email'] ?? 'Member';
-        $ini = strtoupper(substr($fn, 0, 1) . substr($ln, 0, 1));
-        if (trim($ini) === '') $ini = strtoupper(substr($name, 0, 2));
-        $members[] = [
-            'name'     => $name,
-            'plan'     => !empty($row['plan']) ? strtoupper(trim($row['plan'])) : 'NONE',
-            'branch'   => $row['branch'] ?? '—',
-            'status'   => 'Active',
-            'joined'   => !empty($row['created_at']) ? date('M Y', strtotime($row['created_at'])) : '—',
-            'initials' => $ini,
-        ];
-    }
+foreach (app('members')->allWithBranchAndPlan() as $row) {
+    $fn = $row['first_name'] ?? '';
+    $ln = $row['last_name'] ?? '';
+    $name = trim($fn . ' ' . $ln);
+    if ($name === '') $name = $row['email'] ?? 'Member';
+    $ini = strtoupper(substr($fn, 0, 1) . substr($ln, 0, 1));
+    if (trim($ini) === '') $ini = strtoupper(substr($name, 0, 2));
+    $members[] = [
+        'name'     => $name,
+        'plan'     => !empty($row['plan']) ? strtoupper(trim($row['plan'])) : 'NONE',
+        'branch'   => $row['branch'] ?? '—',
+        'status'   => 'Active',
+        'joined'   => !empty($row['created_at']) ? date('M Y', strtotime($row['created_at'])) : '—',
+        'initials' => $ini,
+    ];
 }
 $totalMembers = count($members);
 

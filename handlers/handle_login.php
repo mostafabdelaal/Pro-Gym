@@ -1,7 +1,6 @@
 <?php
-// Authenticate a member. Prepared statement + hashed password + CSRF.
+// Controller: authenticate a member.
 require_once __DIR__ . '/../includes/auth.php';
-$conn = db();
 
 csrf_verify();
 
@@ -13,25 +12,15 @@ if ($email === '' || $password === '') {
     exit();
 }
 
-$stmt = $conn->prepare(
-    "SELECT id, email, password_hash, role FROM members WHERE email = ?"
-);
-$stmt->bind_param('s', $email);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+$user = app('authService')->attempt($email, $password);
 
 if (!$user) {
-    header('Location: ../pages/LoginPage.php?error=email_not_found');
+    $exists = app('members')->findByEmail($email) !== null;
+    header('Location: ../pages/LoginPage.php?error=' . ($exists ? 'incorrect_password' : 'email_not_found'));
     exit();
 }
 
-if (!password_verify($password, $user['password_hash'])) {
-    header('Location: ../pages/LoginPage.php?error=incorrect_password');
-    exit();
-}
-
-// Prevent session fixation: issue a fresh session id on privilege change.
+// Anti-fixation: fresh session id on privilege change.
 session_regenerate_id(true);
 $_SESSION['email']     = $user['email'];
 $_SESSION['member_id'] = (int) $user['id'];

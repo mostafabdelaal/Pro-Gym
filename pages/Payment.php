@@ -12,18 +12,7 @@ if (!$member) {
 $memberId = (int) $member['id'];
 
 // Pull the plan the member selected so the summary reflects reality.
-$stmt = $conn->prepare(
-    "SELECT p.code, p.monthly_price
-     FROM subscriptions s
-     JOIN plans p ON p.id = s.plan_id
-     WHERE s.member_id = ?
-     ORDER BY (s.status = 'pending') DESC, s.created_at DESC
-     LIMIT 1"
-);
-$stmt->bind_param("i", $memberId);
-$stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+$row = app('subscriptions')->selectedPlanForCheckout($memberId);
 
 if (!$row) {
     // No plan chosen yet — send them to pick one first.

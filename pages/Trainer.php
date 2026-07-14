@@ -1,28 +1,10 @@
 <?php
 // Trainer showcase — members only.
 require_once __DIR__ . '/../includes/auth.php';
-$conn = db();
 require_login();
 
-// Load the coaching team from the database (was hardcoded).
-$trainers = [];
-$res = $conn->query(
-    "SELECT t.name, t.role, t.specialty_tag, t.photo_path
-     FROM trainers t
-     WHERE t.is_active = 1
-     ORDER BY t.id"
-);
-if ($res) {
-    while ($row = $res->fetch_assoc()) {
-        $photo = $row['photo_path'] ?? '';
-        $trainers[] = [
-            'name' => $row['name'],
-            'role' => $row['role'],
-            'tag'  => $row['specialty_tag'] ?? '',
-            'bg'   => $photo !== '' ? "url('../" . $photo . "')" : 'none',
-        ];
-    }
-}
+// Coaching team from the trainer repository (was hardcoded).
+$trainers = app('trainers')->allActiveForShowcase();
 ?>
 <!DOCTYPE html>
 <html>

@@ -1,11 +1,10 @@
 <?php
 // Public guest landing page — no authentication required.
 require_once __DIR__ . '/../includes/auth.php';
-$conn = db();
 
 // Real counts for the hero band (branches/coaches were hardcoded).
-$branchCount  = (int) (($conn->query("SELECT COUNT(*) c FROM branches WHERE is_active = 1")->fetch_assoc()['c']) ?? 0);
-$trainerCount = (int) (($conn->query("SELECT COUNT(*) c FROM trainers WHERE is_active = 1")->fetch_assoc()['c']) ?? 0);
+$branchCount  = app('branches')->countActive();
+$trainerCount = app('trainers')->countActive();
 ?>
 <!DOCTYPE html>
 <html>

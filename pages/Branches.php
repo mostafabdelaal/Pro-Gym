@@ -1,15 +1,8 @@
 <?php
-// Branch locations — loaded from the database (was hardcoded HTML).
+// Branch locations — from the branch repository (was hardcoded HTML).
 require_once __DIR__ . '/../includes/auth.php';
-$conn = db();
 
-$branches = [];
-$res = $conn->query("SELECT name, image_path FROM branches WHERE is_active = 1 ORDER BY id");
-if ($res) {
-    while ($row = $res->fetch_assoc()) {
-        $branches[] = $row;
-    }
-}
+$branches = app('branches')->allActive();
 ?>
 <!DOCTYPE html>
 <html>

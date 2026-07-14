@@ -1,36 +1,10 @@
 <?php
 // Plan subscription grid — members only.
 require_once __DIR__ . '/../includes/auth.php';
-$conn = db();
 require_login();
 
-// Load plans + their features from the database (was hardcoded in JS).
-$planData = [];
-$plansRes = $conn->query(
-    "SELECT id, code, monthly_price, is_popular
-     FROM plans WHERE is_active = 1 ORDER BY sort_order, id"
-);
-if ($plansRes && $plansRes->num_rows > 0) {
-    // Fetch every feature in one query, then group in PHP (avoids N+1).
-    $featuresByPlan = [];
-    $featRes = $conn->query(
-        "SELECT plan_id, feature FROM plan_features ORDER BY plan_id, sort_order, id"
-    );
-    if ($featRes) {
-        while ($f = $featRes->fetch_assoc()) {
-            $featuresByPlan[(int) $f['plan_id']][] = $f['feature'];
-        }
-    }
-    while ($p = $plansRes->fetch_assoc()) {
-        $pid = (int) $p['id'];
-        $planData[] = [
-            'name'     => $p['code'],
-            'price'    => (float) $p['monthly_price'],
-            'popular'  => (bool) $p['is_popular'],
-            'features' => $featuresByPlan[$pid] ?? [],
-        ];
-    }
-}
+// Plans + features from the plan repository (was hardcoded in JS).
+$planData = app('plans')->allActiveWithFeatures();
 ?>
 <!DOCTYPE html>
 <html>

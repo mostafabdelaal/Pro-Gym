@@ -1,130 +1,109 @@
 <?php
-// Shared session, CSRF, authentication, and member helpers.
-// Include this at the top of every page/handler that needs a session or the DB.
+// Composition root + backward-compatible helper shims.
+//
+// Boots the autoloader/session, wires the repository + service layer with a
+// tiny lazy container (app()), and exposes the thin procedural helpers the
+// pages and handlers already call. New code should prefer app('...') services.
 
-require_once __DIR__ . '/../config/database.php'; // provides $conn (mysqli)
+require_once __DIR__ . '/bootstrap.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-/** Return the shared mysqli connection. */
-function db(): mysqli
-{
-    global $conn;
-    return $conn;
-}
-
-/* --------------------------------------------------------------------------
- * CSRF protection
- * ------------------------------------------------------------------------ */
-
-/** Get (or lazily create) the per-session CSRF token. */
-function csrf_token(): string
-{
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-/** Hidden <input> to drop inside any POST form. */
-function csrf_field(): string
-{
-    return '<input type="hidden" name="csrf_token" value="'
-        . htmlspecialchars(csrf_token(), ENT_QUOTES) . '">';
-}
-
-/** Abort the request unless a valid CSRF token was posted. Call in handlers. */
-function csrf_verify(): void
-{
-    $sent = $_POST['csrf_token'] ?? '';
-    if (!is_string($sent) || !hash_equals($_SESSION['csrf_token'] ?? '', $sent)) {
-        http_response_code(400);
-        exit('Invalid or missing CSRF token. Please reload the page and try again.');
-    }
-}
-
-/* --------------------------------------------------------------------------
- * Authentication / authorization
- * ------------------------------------------------------------------------ */
-
-/** Redirect to login if no session; otherwise return the logged-in email. */
-function require_login(): string
-{
-    if (empty($_SESSION['email'])) {
-        header('Location: LoginPage.php');
-        exit();
-    }
-    return $_SESSION['email'];
-}
+use ProGym\Config\Database;
+use ProGym\Repository\MemberRepository;
+use ProGym\Repository\PlanRepository;
+use ProGym\Repository\SubscriptionRepository;
+use ProGym\Repository\PaymentRepository;
+use ProGym\Repository\PasswordResetRepository;
+use ProGym\Repository\BranchRepository;
+use ProGym\Repository\TrainerRepository;
+use ProGym\Service\AuthService;
+use ProGym\Service\RegistrationService;
+use ProGym\Service\SubscriptionService;
+use ProGym\Service\PaymentService;
+use ProGym\Service\PasswordResetService;
+use ProGym\Support\Auth;
+use ProGym\Support\Csrf;
 
 /**
- * Fetch the logged-in member joined to their current plan code.
- * Returns null when not logged in or the member no longer exists.
+ * Lazy service container. Each key is built once and cached.
+ * Keys: conn, members, plans, subscriptions, payments, resets,
+ *       auth, authService, registration, subscription, payment, reset.
  */
-function current_member(mysqli $conn): ?array
+function app(string $key)
 {
-    if (empty($_SESSION['email'])) {
-        return null;
+    static $c = [];
+    if (array_key_exists($key, $c)) {
+        return $c[$key];
     }
-    $sql = "SELECT m.*, p.code AS plan
-            FROM members m
-            LEFT JOIN subscriptions s
-                   ON s.member_id = m.id AND s.status IN ('active', 'pending')
-            LEFT JOIN plans p ON p.id = s.plan_id
-            WHERE m.email = ?
-            ORDER BY (s.status = 'active') DESC, s.created_at DESC
-            LIMIT 1";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('s', $_SESSION['email']);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return $row ?: null;
+
+    $conn      = Database::connection();
+    $members   = static fn() => new MemberRepository($conn);
+    $plans     = static fn() => new PlanRepository($conn);
+    $subs      = static fn() => new SubscriptionRepository($conn);
+    $payments  = static fn() => new PaymentRepository($conn);
+    $resets    = static fn() => new PasswordResetRepository($conn);
+
+    $build = [
+        'conn'         => static fn() => $conn,
+        'members'      => $members,
+        'plans'        => $plans,
+        'subscriptions'=> $subs,
+        'payments'     => $payments,
+        'resets'       => $resets,
+        'branches'     => static fn() => new BranchRepository($conn),
+        'trainers'     => static fn() => new TrainerRepository($conn),
+        'auth'         => static fn() => new Auth($members()),
+        'authService'  => static fn() => new AuthService($members()),
+        'registration' => static fn() => new RegistrationService($members()),
+        'subscription' => static fn() => new SubscriptionService($plans(), $subs()),
+        'payment'      => static fn() => new PaymentService($subs(), $payments(), $conn),
+        'reset'        => static fn() => new PasswordResetService($members(), $resets(), $conn),
+    ];
+
+    if (!isset($build[$key])) {
+        throw new InvalidArgumentException("Unknown service: $key");
+    }
+    return $c[$key] = $build[$key]();
 }
 
-/** Require an authenticated member with the admin role, or 403. */
-function require_admin(mysqli $conn): array
+/* ---- Backward-compatible procedural helpers (used across the pages) ------- */
+
+function db(): mysqli
 {
-    require_login();
-    $member = current_member($conn);
-    if (!$member || ($member['role'] ?? '') !== 'admin') {
-        http_response_code(403);
-        exit('Forbidden — admin access required.');
-    }
-    return $member;
+    return app('conn');
 }
 
-/* --------------------------------------------------------------------------
- * Presentation helper — DRYs the name/initials/plan block the sidebar pages
- * used to duplicate (and repairs the old first_Name/first_name casing hack).
- * ------------------------------------------------------------------------ */
+function csrf_token(): string
+{
+    return Csrf::token();
+}
+
+function csrf_field(): string
+{
+    return Csrf::field();
+}
+
+function csrf_verify(): void
+{
+    Csrf::verify();
+}
+
+function require_login(): string
+{
+    return app('auth')->requireLogin();
+}
+
+// The optional $conn arg is ignored — kept so existing call sites still work.
+function current_member(?mysqli $conn = null): ?array
+{
+    return app('auth')->currentMember();
+}
+
+function require_admin(?mysqli $conn = null): array
+{
+    return app('auth')->requireAdmin();
+}
+
 function member_display(?array $m): array
 {
-    $first = $m['first_name'] ?? '';
-    $last  = $m['last_name'] ?? '';
-    $email = $m['email'] ?? '';
-    $plan  = !empty($m['plan']) ? strtoupper(trim($m['plan'])) : 'NONE';
-
-    $full = trim($first . ' ' . $last);
-    if ($full === '') {
-        $full = $email;
-    }
-    $initials = strtoupper(substr($first, 0, 1) . substr($last, 0, 1));
-    if (trim($initials) === '') {
-        $initials = strtoupper(substr($email, 0, 2));
-    }
-    $greet = $first !== '' ? $first : (explode('@', $email)[0] ?? $email);
-
-    return [
-        'first'     => $first,
-        'last'      => $last,
-        'email'     => $email,
-        'plan'      => $plan,
-        'fullName'  => $full,
-        'initials'  => $initials,
-        'greetName' => $greet,
-        'planLabel' => ucfirst(strtolower($plan)) . ' plan',
-    ];
+    return Auth::display($m);
 }
